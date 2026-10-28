@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Photo Insight</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Photo Insight <span class="muted" data-i18n="offline"></span></div>
+  <div class="status">
+    <span id="ollama" class="pill" data-i18n="checking"></span>
+    <label class="model"><span data-i18n="model"></span> <select id="model"></select></label>
+    <select id="uiLang" aria-label="Language / 語言">
+      <option value="en">English</option>
+      <option value="yue">廣東話</option>
+    </select>
+  </div>
+</header>
+
+<section class="toolbar">
+  <form id="folderForm" class="folder">
+    <input id="folderPath" data-i18n-ph="folder_ph" spellcheck="false" autocomplete="off">
+    <button type="button" id="browse" data-i18n="choose_folder"></button>
+    <label class="check"><input type="checkbox" id="recursive" checked> <span data-i18n="subfolders"></span></label>
+    <button type="submit" class="secondary" data-i18n="open"></button>
+    <span class="or" data-i18n="or"></span>
+    <button type="button" id="choosePhotos" data-i18n="choose_photos"></button>
+    <button type="button" id="addPhotos" hidden data-i18n="add_photos" data-i18n-title="add_photos_title"></button>
+  </form>
+  <div class="run">
+    <button id="analyze" class="primary" disabled></button>
+    <button id="reanalyze" disabled data-i18n-title="reanalyze_title"></button>
+    <button id="cancel" hidden data-i18n="cancel"></button>
+  </div>
+  <div class="progress" id="progressWrap" hidden>
+    <div class="bar"><div id="bar"></div></div>
+    <span id="progressText"></span>
+  </div>
+</section>
+
+<main class="layout">
+  <aside class="side">
+    <div class="side-head">
+      <h2 data-i18n="categories"></h2>
+      <button id="editCats" class="link" data-i18n="edit"></button>
+    </div>
+    <ul id="catList" class="cats"></ul>
+    <h2 data-i18n="apply"></h2>
+    <div class="actions">
+      <button id="organize" disabled></button>
+      <button id="sidecars" disabled data-i18n-title="xmp_title"></button>
+      <button id="csv" disabled></button>
+    </div>
+    <p id="notice" class="notice" hidden></p>
+    <button id="openData" class="link data-link" data-i18n="local_data"></button>
+  </aside>
+
+  <section class="content">
+    <div id="empty" class="empty">
+      <h1 data-i18n="empty_h"></h1>
+      <ol>
+        <li data-i18n="empty_1"></li>
+        <li data-i18n="empty_2"></li>
+        <li data-i18n="empty_3"></li>
+        <li data-i18n="empty_4"></li>
+      </ol>
+    </div>
+    <div id="selbar" class="selbar" hidden>
+      <label class="check"><input type="checkbox" id="selAll"> <span id="selText"></span></label>
+      <button id="selNone" class="link" hidden data-i18n="clear_sel"></button>
+      <button id="removeSel" class="link" hidden data-i18n-title="remove_title"></button>
+      <button id="clearAll" class="link danger" data-i18n="clear_all" data-i18n-title="clear_all_title"></button>
+      <span class="muted hint" data-i18n="hint"></span>
+    </div>
+    <div id="grid" class="grid"></div>
+  </section>
+</main>
+
+<dialog id="catDialog">
+  <form method="dialog" id="catForm">
+    <h2 data-i18n="categories"></h2>
+    <p class="muted" data-i18n="cat_intro"></p>
+    <div id="catRows"></div>
+    <div class="row">
+      <button type="button" id="addCat" class="link" data-i18n="add_cat"></button>
+      <span class="muted"><span data-i18n="starter"></span>:
+        <button type="button" class="link starter" data-set="en" data-i18n="starter_en"></button> ·
+        <button type="button" class="link starter" data-set="yue" data-i18n="starter_yue"></button></span>
+    </div>
+    <h2 data-i18n="tags_captions"></h2>
+    <div class="settings">
+      <label><span data-i18n="caption_lang"></span>
+        <select id="language">
+          <option value="English" data-i18n="lang_en"></option>
+          <option value="Cantonese" data-i18n="lang_yue"></option>
+          <option value="Traditional Chinese" data-i18n="lang_zh"></option>
+        </select>
+      </label>
+      <label><span data-i18n="max_tags"></span> <input type="number" id="maxTags" min="1" max="30"></label>
+      <label class="check"><input type="checkbox" id="general"> <span data-i18n="general_tags"></span></label>
+      <label class="check"><input type="checkbox" id="chineseTags"> <span data-i18n="chinese_tags"></span></label>
+      <label><span data-i18n="min_conf"></span> <input type="number" id="minConf" min="0" max="1" step="0.05"></label>
+      <label><span data-i18n="image_size"></span> <input type="number" id="imageSize" min="512" max="4096" step="64"></label>
+    </div>
+    <h2 data-i18n="location"></h2>
+    <label class="check"><input type="checkbox" id="locTags"> <span data-i18n="loc_tags"></span></label>
+    <label class="check"><input type="checkbox" id="lmTags"> <span data-i18n="lm_tags"></span></label>
+    <div class="geo-box">
+      <span id="geoStatus" class="muted"></span>
+      <div class="row">
+        <input id="geoCountries" spellcheck="false" data-i18n-title="geo_countries_title">
+        <button type="button" id="geoDownload"></button>
+      </div>
+      <p class="muted small" data-i18n="geo_note"></p>
+    </div>
+    <p class="muted" data-i18n="outdated_note"></p>
+    <div class="dialog-actions">
+      <button value="cancel" formnovalidate data-i18n="cancel"></button>
+      <button id="saveCats" value="save" class="primary" data-i18n="save"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="orgDialog">
+  <form method="dialog">
+    <h2 data-i18n="org_title"></h2>
+    <p class="muted" data-i18n="org_intro"></p>
+    <div class="settings">
+      <label><span data-i18n="sort_by"></span>
+        <select id="orgGroup">
+          <option value="category" data-i18n="group_category"></option>
+          <option value="location" data-i18n="group_location"></option>
+          <option value="location_category" data-i18n="group_location_category"></option>
+          <option value="category_location" data-i18n="group_category_location"></option>
+        </select>
+      </label>
+      <label class="locopt"><span data-i18n="loc_level"></span>
+        <select id="orgLevel">
+          <option value="country" data-i18n="level_country"></option>
+          <option value="city" data-i18n="level_city"></option>
+          <option value="area" data-i18n="level_area"></option>
+        </select>
+      </label>
+      <label class="locopt"><span data-i18n="folder_names"></span>
+        <select id="orgNames">
+          <option value="en">English</option>
+          <option value="zh">中文</option>
+        </select>
+      </label>
+    </div>
+    <div class="plan">
+      <strong data-i18n="plan_title"></strong>
+      <ul id="orgPlan"></ul>
+      <p id="orgSkipped" class="muted small" hidden></p>
+    </div>
+    <label><span data-i18n="dest"></span> <input id="dest" spellcheck="false"></label>
+    <label class="check"><input type="radio" name="mode" value="copy" checked> <span data-i18n="copy_opt"></span></label>
+    <label class="check"><input type="radio" name="mode" value="move"> <span data-i18n="move_opt"></span></label>
+    <label class="check embed-opt"><input type="checkbox" id="orgEmbed">
+      <span><span data-i18n="embed_opt"></span><br><span class="muted small" id="embedHint"></span></span></label>
+    <div class="dialog-actions">
+      <button value="cancel" data-i18n="cancel"></button>
+      <button value="go" id="orgGo" class="primary" data-i18n="sort_go"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dataDialog">
+  <form method="dialog" id="dataForm">
+    <h2 data-i18n="local_data_title"></h2>
+    <p class="muted"><span data-i18n="data_intro"></span> <code id="dataHome"></code></p>
+    <div class="data-rows">
+      <label class="check"><input type="checkbox" id="clrResults" checked>
+        <span><b data-i18n="data_results"></b><br><span class="muted small" id="dataResults"></span></span></label>
+      <label class="check"><input type="checkbox" id="clrThumbs" checked>
+        <span><b data-i18n="data_thumbs"></b><br><span class="muted small" id="dataThumbs"></span></span></label>
+      <label class="check"><input type="checkbox" id="clrSettings">
+        <span><b data-i18n="data_settings"></b><br><span class="muted small" id="dataSettings"></span></span></label>
+      <label class="check"><input type="checkbox" id="clrGeo">
+        <span><b data-i18n="data_geo"></b><br><span class="muted small" id="dataGeo"></span></span></label>
+    </div>
+    <p class="notice" data-i18n="data_safe"></p>
+    <div class="dialog-actions">
+      <button value="cancel" data-i18n="cancel"></button>
+      <button id="clearData" type="button" class="primary danger-btn" data-i18n="clear_selected"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="preview" class="preview">
+  <div class="pv-stage">
+    <button class="pv-nav" id="pvPrev" data-i18n-title="prev">‹</button>
+    <img id="pvImg" alt="">
+    <button class="pv-nav" id="pvNext" data-i18n-title="next">›</button>
+  </div>
+  <div class="pv-info">
+    <div class="row">
+      <strong id="pvName"></strong>
+      <span class="muted" id="pvPos"></span>
+    </div>
+    <div id="pvMeta" class="muted"></div>
+    <p id="pvCaption"></p>
+    <p id="pvTags" class="tags"></p>
+    <div class="dialog-actions">
+      <label class="check"><input type="checkbox" id="pvSel"> <span data-i18n="selected"></span> <span class="muted" data-i18n="space"></span></label>
+      <button id="pvClose" data-i18n="close"></button>
+    </div>
+  </div>
+</dialog>
+
+<template id="cardTpl">
+  <article class="card">
+    <div class="thumb"><img loading="lazy" alt="" data-i18n-title="preview_title"><span class="badge"></span>
+      <label class="pick" data-i18n-title="select"><input type="checkbox" class="sel"></label></div>
+    <div class="body">
+      <div class="row">
+        <span class="name"></span>
+        <button class="link reset" hidden data-i18n="reset" data-i18n-title="reset_title"></button>
+      </div>
+      <div class="loc" hidden></div>
+      <select class="category"></select>
+      <div class="conf"><div></div></div>
+      <textarea class="caption" rows="2" data-i18n-ph="caption_ph"></textarea>
+      <textarea class="tags" rows="3" placeholder="#hashtags" spellcheck="false"></textarea>
+      <button class="copy" data-i18n="copy"></button>
+    </div>
+  </article>
+</template>
+
+<script src="/static/i18n.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
